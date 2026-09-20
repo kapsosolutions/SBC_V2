@@ -67,7 +67,7 @@ npm run dev            # http://localhost:8080
 **Frontend**
 ```bash
 cd frontend
-cp .env.example .env.local   # set NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
+cp .env.example .env   # set NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
 npm install
 npm run dev                  # http://localhost:3000
 ```
@@ -85,7 +85,7 @@ No secrets are committed. Each service has a `.env.example` template.
 - `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`
 - `APP_PUBLIC_URL`, `NOTIFICATION_ICON_URL`
 
-**Frontend** (`frontend/.env.local` locally, Vercel dashboard in prod)
+**Frontend** (`frontend/.env` locally, Vercel dashboard in prod)
 - `NEXT_PUBLIC_API_BASE_URL` — the deployed backend URL
 - `NEXT_PUBLIC_FIREBASE_*` — Firebase web config
 - `NEXT_PUBLIC_FIREBASE_VAPID_KEY`
