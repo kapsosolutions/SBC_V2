@@ -1111,12 +1111,39 @@ export default function StudentDashboard() {
         );
 
         /*
-         * Must be directly
-         * triggered by button click.
+         * If the user previously BLOCKED notifications at the browser
+         * level, the permission prompt will not reappear. Guide them to
+         * re-enable it manually instead of silently hanging.
          */
+        if (
+          typeof Notification !== "undefined" &&
+          Notification.permission === "denied"
+        ) {
+          throw new Error(
+            "Notifications are blocked in your browser. Please allow notifications for this site in your browser settings, then try again."
+          );
+        }
 
-        const token =
-          await enableStudentNotifications();
+        /*
+         * Must be directly triggered by button click.
+         *
+         * Guard against a hung FCM / service-worker call so the button
+         * never gets stuck on "Enabling Notifications...".
+         */
+        const token = await Promise.race([
+          enableStudentNotifications(),
+          new Promise<never>((_, reject) =>
+            setTimeout(
+              () =>
+                reject(
+                  new Error(
+                    "Enabling notifications timed out. Please check your connection and try again."
+                  )
+                ),
+              30000
+            )
+          ),
+        ]);
 
         if (!token) {
           throw new Error(

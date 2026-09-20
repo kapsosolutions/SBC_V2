@@ -7,6 +7,8 @@ import cors from "cors";
 import helmet from "helmet";
 import { env } from "./config/env";
 
+import { firebaseConfigured } from "./lib/firebase-admin";
+import { razorpayConfigured } from "./lib/razorpay";
 import adminRoutes from "./routes/admin";
 import businessRoutes from "./routes/business";
 import paymentRoutes from "./routes/payment";
@@ -71,12 +73,51 @@ app.use(express.json({ limit: "1mb" }));
 /*
  * Health checks (used by Render).
  */
+const API_ENDPOINTS: Array<{ method: string; path: string; auth: string }> = [
+  { method: "GET", path: "/health", auth: "public" },
+  { method: "POST", path: "/api/student/check-mobile", auth: "public" },
+  { method: "POST", path: "/api/business/check-mobile", auth: "public" },
+  { method: "POST", path: "/api/business/reset-password", auth: "public" },
+  { method: "POST", path: "/api/admin/check-email", auth: "public" },
+  { method: "GET", path: "/api/admin/payouts", auth: "admin" },
+  { method: "PATCH", path: "/api/admin/payouts", auth: "admin" },
+  { method: "POST", path: "/api/admin/notifications/send", auth: "admin" },
+  { method: "POST", path: "/api/payment/create-order", auth: "user" },
+  { method: "POST", path: "/api/payment/verify", auth: "user" },
+  { method: "GET", path: "/api/payout/history", auth: "user" },
+  { method: "POST", path: "/api/payout/request", auth: "user" },
+  { method: "POST", path: "/api/redemption/create", auth: "user" },
+  { method: "POST", path: "/api/referral/process", auth: "user" },
+  { method: "POST", path: "/api/referral/reconcile", auth: "user" },
+];
+
+// Status page: service health + endpoint inventory in JSON.
 app.get("/", (_req, res) => {
-  res.json({ service: "sbc-backend", status: "ok" });
+  res.json({
+    service: "sbc-backend",
+    status: "ok",
+    environment: env.nodeEnv,
+    timestamp: new Date().toISOString(),
+    uptimeSeconds: Math.round(process.uptime()),
+    config: {
+      firebaseAdmin: firebaseConfigured() ? "configured" : "missing",
+      razorpay: razorpayConfigured() ? "configured" : "missing",
+      allowedOrigins:
+        env.frontendOrigins.length > 0
+          ? env.frontendOrigins
+          : "all (unrestricted)",
+    },
+    endpoints: API_ENDPOINTS.map((e) => ({ ...e, status: "active" })),
+  });
 });
 
 app.get("/health", (_req, res) => {
-  res.json({ status: "ok", uptime: process.uptime() });
+  res.json({
+    status: "ok",
+    service: "sbc-backend",
+    timestamp: new Date().toISOString(),
+    uptimeSeconds: Math.round(process.uptime()),
+  });
 });
 
 /*

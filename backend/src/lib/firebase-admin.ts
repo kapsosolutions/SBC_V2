@@ -80,3 +80,15 @@ export function adminAuth() {
 export function adminMessaging() {
   return getMessaging(getAdminApp());
 }
+
+/**
+ * True when all Firebase Admin credentials are present in the environment.
+ * Used by the status endpoint (does not initialise the app).
+ */
+export function firebaseConfigured(): boolean {
+  return Boolean(
+    env.firebase.projectId &&
+      env.firebase.clientEmail &&
+      (env.firebase.privateKeyBase64 || env.firebase.privateKey)
+  );
+}
