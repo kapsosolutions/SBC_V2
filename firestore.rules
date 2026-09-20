@@ -1,0 +1,264 @@
+rules_version = '2';
+
+service cloud.firestore {
+
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn() &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    function isStudent(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function isBusiness(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    // =========================
+    // ADMINS
+    // =========================
+
+    match /admins/{adminId} {
+      allow read: if signedIn() && request.auth.uid == adminId;
+      allow write: if isAdmin();
+    }
+
+    // =========================
+    // STUDENTS
+    // =========================
+
+    match /students/{studentId} {
+      allow create: if isStudent(studentId);
+
+      allow read: if isStudent(studentId) || isAdmin();
+
+      allow update: if isAdmin()
+        || (
+          isStudent(studentId) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            "fullName",
+            "mobile",
+            "email",
+            "college",
+            "course",
+            "year",
+            "photoURL",
+            "profileImage",
+            "profileImageUrl",
+            "updatedAt",
+            "notificationsEnabled"
+          ])
+        )
+        || (
+          signedIn() &&
+          isBusiness(request.auth.uid) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            "points",
+            "totalPointsEarned",
+            "lastPointsEarned",
+            "lastPointsEarnedAt",
+            "lastPointsBusinessId",
+            "lastPointsBusinessName",
+            "lastPointsRedemptionId",
+            "updatedAt"
+          ]) &&
+          request.resource.data.lastPointsBusinessId == request.auth.uid
+        );
+
+      allow delete: if isAdmin();
+    }
+
+    // =========================
+    // BUSINESSES
+    // =========================
+
+    match /businesses/{businessId} {
+      allow read: if signedIn();
+
+      allow create: if signedIn()
+        && request.resource.data.businessId == request.auth.uid;
+
+      allow update: if isBusiness(businessId) || isAdmin();
+
+      allow delete: if isAdmin();
+    }
+
+    // =========================
+    // CATEGORIES
+    // =========================
+
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // =========================
+    // OFFERS
+    // =========================
+
+    match /offers/{offerId} {
+      allow read: if signedIn();
+
+      allow create: if signedIn()
+        && request.resource.data.businessId == request.auth.uid;
+
+      allow update: if isAdmin()
+        || (
+          signedIn() &&
+          resource.data.businessId == request.auth.uid
+        );
+
+      allow delete: if isAdmin()
+        || (
+          signedIn() &&
+          resource.data.businessId == request.auth.uid
+        );
+    }
+
+    // =========================
+    // BUSINESS STUDENT USAGE
+    // =========================
+
+    match /businessStudentUsage/{usageId} {
+      allow read: if isAdmin()
+        || (
+          signedIn() &&
+          usageId.split("_")[0] == request.auth.uid
+        )
+        || (
+          signedIn() &&
+          resource.data.studentId == request.auth.uid
+        );
+
+      allow create, update: if isAdmin()
+        || (
+          signedIn() &&
+          request.resource.data.businessId == request.auth.uid
+        );
+
+      allow delete: if isAdmin();
+    }
+
+    // =========================
+    // STUDENT POINTS
+    // =========================
+
+    match /studentPoints/{studentId} {
+      allow read: if isAdmin() || isStudent(studentId);
+
+      allow create, update: if isAdmin()
+        || (
+          signedIn() &&
+          request.resource.data.studentId == studentId &&
+          request.resource.data.lastPointsBusinessId == request.auth.uid
+        );
+
+      allow delete: if isAdmin();
+    }
+
+    // =========================
+    // REDEMPTION REQUESTS
+    // =========================
+
+    match /redemptionRequests/{requestId} {
+
+      // Creation is server-only.
+      // /api/redemption/create performs authentication,
+      // membership-expiry, offer and usage checks.
+      allow create: if false;
+
+      allow read: if isAdmin()
+        || (
+          signedIn() &&
+          resource.data.studentId == request.auth.uid
+        )
+        || (
+          signedIn() &&
+          resource.data.businessId == request.auth.uid
+        );
+
+      allow update: if isAdmin()
+        || (
+          signedIn() &&
+          resource.data.businessId == request.auth.uid &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            "status",
+            "updatedAt",
+            "rejectedAt",
+            "approvedAt",
+            "rejectionReason"
+          ]) &&
+          (
+            request.resource.data.status == "approved" ||
+            request.resource.data.status == "rejected" ||
+            request.resource.data.status == "pending"
+          )
+        );
+
+      allow delete: if isAdmin();
+    }
+
+    // =========================
+    // REDEMPTIONS
+    // =========================
+
+    match /redemptions/{redeemId} {
+      allow create: if signedIn()
+        && request.resource.data.businessId == request.auth.uid;
+
+      allow read: if isAdmin()
+        || (
+          signedIn() &&
+          resource.data.studentId == request.auth.uid
+        )
+        || (
+          signedIn() &&
+          resource.data.businessId == request.auth.uid
+        );
+
+      allow update, delete: if isAdmin();
+    }
+
+    // =========================
+    // PAYOUT REQUESTS
+    // =========================
+
+    match /payoutRequests/{payoutId} {
+
+      // Payout requests are created only by the
+      // authenticated server API using Firebase Admin SDK.
+      allow create: if false;
+
+      // Students can only read their own payout requests.
+      // Admins can read all payout requests.
+      allow read: if isAdmin()
+        || (
+          signedIn() &&
+          resource.data.uid == request.auth.uid
+        );
+
+      // Students cannot modify payout requests.
+      // Admin API uses Firebase Admin SDK, so these rules
+      // do not block legitimate admin processing.
+      allow update: if false;
+
+      // No client-side deletion.
+      allow delete: if false;
+    }
+
+    // =========================
+    // BLOCK EVERYTHING ELSE
+    // =========================
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

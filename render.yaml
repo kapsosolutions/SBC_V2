@@ -1,0 +1,33 @@
+# Render Blueprint for the SBC backend API.
+# Docs: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: sbc-backend
+    runtime: node
+    plan: free
+    region: singapore
+    rootDir: backend
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Render sets PORT automatically; the app reads process.env.PORT.
+      - key: FRONTEND_ORIGIN
+        sync: false # e.g. https://your-app.vercel.app,https://www.studentbenefitcard.com
+      - key: FIREBASE_ADMIN_PROJECT_ID
+        sync: false
+      - key: FIREBASE_ADMIN_CLIENT_EMAIL
+        sync: false
+      - key: FIREBASE_ADMIN_PRIVATE_KEY_BASE64
+        sync: false
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: APP_PUBLIC_URL
+        sync: false
+      - key: NOTIFICATION_ICON_URL
+        sync: false
