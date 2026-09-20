@@ -27,14 +27,38 @@ app.use(helmet());
  */
 const allowedOrigins = env.frontendOrigins;
 
+/*
+ * Match a request Origin against the configured allow-list. Each entry may
+ * be an exact origin (https://app.vercel.app) or a wildcard pattern
+ * (https://*.vercel.app) so Vercel preview deployments are covered.
+ */
+function isOriginAllowed(origin: string): boolean {
+  for (const entry of allowedOrigins) {
+    if (entry === origin) return true;
+    if (entry.includes("*")) {
+      const pattern =
+        "^" +
+        entry
+          .replace(/[.+?^${}()|[\]\\]/g, "\\$&") // escape regex metachars
+          .replace(/\*/g, ".*") + // wildcard -> match anything
+        "$";
+      if (new RegExp(pattern).test(origin)) return true;
+    }
+  }
+  return false;
+}
+
 app.use(
   cors({
     origin(origin, callback) {
       // Allow same-origin / server-to-server requests with no Origin header.
       if (!origin) return callback(null, true);
+      // If nothing is configured (e.g. very first deploy), allow all.
       if (allowedOrigins.length === 0) return callback(null, true);
-      if (allowedOrigins.includes(origin)) return callback(null, true);
-      return callback(new Error(`Origin not allowed by CORS: ${origin}`));
+      if (isOriginAllowed(origin)) return callback(null, true);
+      // Disallowed: respond without CORS headers (browser will block).
+      console.warn(`CORS: blocked origin ${origin}`);
+      return callback(null, false);
     },
     methods: ["GET", "POST", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
